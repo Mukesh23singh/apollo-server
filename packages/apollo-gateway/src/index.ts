@@ -190,6 +190,7 @@ export class ApolloGateway implements GraphQLService {
   protected config: GatewayConfig;
   private logger: Logger;
   protected queryPlanStore?: InMemoryLRUCache<QueryPlan>;
+  protected printedOperationStore?: InMemoryLRUCache<string>;
   private engineConfig: GraphQLServiceEngineConfig | undefined;
   private pollingTimer?: NodeJS.Timer;
   private onSchemaChangeListeners = new Set<SchemaChangeCallback>();
@@ -250,6 +251,7 @@ export class ApolloGateway implements GraphQLService {
     }
 
     this.initializeQueryPlanStore();
+    this.initializePrintedOperationStore();
 
     // this will be overwritten if the config provides experimental_updateServiceDefinitions
     this.updateServiceDefinitions = this.loadServiceDefinitions;
@@ -392,6 +394,7 @@ export class ApolloGateway implements GraphQLService {
     this.serviceDefinitions = result.serviceDefinitions;
 
     if (this.queryPlanStore) this.queryPlanStore.flush();
+    if (this.printedOperationStore) this.printedOperationStore.flush();
 
     this.schema = this.createSchema(result.serviceDefinitions);
 
@@ -633,6 +636,7 @@ export class ApolloGateway implements GraphQLService {
       this.schema!,
       document,
       request.operationName,
+      this.printedOperationStore,
     );
 
     // No need to build a query plan if we know the request is invalid beforehand
@@ -758,6 +762,21 @@ export class ApolloGateway implements GraphQLService {
 
   private initializeQueryPlanStore(): void {
     this.queryPlanStore = new InMemoryLRUCache<QueryPlan>({
+      // Create ~about~ a 30MiB InMemoryLRUCache.  This is less than precise
+      // since the technique to calculate the size of a DocumentNode is
+      // only using JSON.stringify on the DocumentNode (and thus doesn't account
+      // for unicode characters, etc.), but it should do a reasonable job at
+      // providing a caching document store for most operations.
+      maxSize:
+        Math.pow(2, 20) *
+        (this.experimental_approximateQueryPlanStoreMiB || 30),
+      sizeCalculator: approximateObjectSize,
+    });
+  }
+
+  // TODO: sizing?
+  private initializePrintedOperationStore(): void {
+    this.printedOperationStore = new InMemoryLRUCache<string>({
       // Create ~about~ a 30MiB InMemoryLRUCache.  This is less than precise
       // since the technique to calculate the size of a DocumentNode is
       // only using JSON.stringify on the DocumentNode (and thus doesn't account

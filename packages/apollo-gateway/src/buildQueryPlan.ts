@@ -48,6 +48,7 @@ import {
 } from './QueryPlan';
 import { getFieldDef, getResponseName } from './utilities/graphql';
 import { MultiMap } from './utilities/MultiMap';
+import { InMemoryLRUCache } from 'apollo-server-caching/src';
 
 const typenameField = {
   kind: Kind.FIELD,
@@ -773,6 +774,7 @@ export function buildOperationContext(
   schema: GraphQLSchema,
   document: DocumentNode,
   operationName?: string,
+  printedOperationStore?: InMemoryLRUCache<string>,
 ): OperationContext {
   let operation: OperationDefinitionNode | undefined;
   const fragments: {
@@ -807,7 +809,7 @@ export function buildOperationContext(
     }
   }
 
-  return { schema, operation, fragments };
+  return { schema, operation, fragments, printedOperationStore };
 }
 
 export function buildQueryPlanningContext(

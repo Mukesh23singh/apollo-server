@@ -3,6 +3,7 @@ import {
   GraphQLRequestContext,
 } from 'apollo-server-types';
 import { Headers } from 'apollo-server-env';
+import createSHA from 'apollo-server-core/dist/utils/createSHA';
 import {
   execute,
   GraphQLError,
@@ -291,7 +292,22 @@ async function executeFetch<TContext>(
     operation: DocumentNode,
     variables: Record<string, any>,
   ): Promise<ResultMap | void | null> {
-    const source = stripIgnoredCharacters(print(operation));
+    // TODO: don't need stable stringification because...or do we?
+    const operationHash = createSHA('sha512')
+      .update(JSON.stringify(operation))
+      .digest('hex');
+
+    let source = await context.operationContext.printedOperationStore?.get(
+      operationHash,
+    );
+    if (!source) {
+      source = stripIgnoredCharacters(print(operation));
+      context.operationContext.printedOperationStore?.set(
+        operationHash,
+        source,
+      );
+    }
+
     // We declare this as 'any' because it is missing url and method, which
     // GraphQLRequest.http is supposed to have if it exists.
     let http: any;
@@ -328,7 +344,7 @@ async function executeFetch<TContext>(
         downstreamServiceError(
           error.message,
           fetch.serviceName,
-          source,
+          source!,
           variables,
           error.extensions,
           error.path,

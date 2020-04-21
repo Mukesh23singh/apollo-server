@@ -7,6 +7,7 @@ import {
 } from 'graphql';
 import { astSerializer, queryPlanSerializer } from './snapshotSerializers';
 import prettyFormat from 'pretty-format';
+import { InMemoryLRUCache } from 'apollo-server-caching/src';
 
 export type ResponsePath = (string | number)[];
 
@@ -21,6 +22,7 @@ export type OperationContext = {
   schema: GraphQLSchema;
   operation: OperationDefinitionNode;
   fragments: FragmentMap;
+  printedOperationStore?: InMemoryLRUCache<string>;
 };
 
 export type PlanNode = SequenceNode | ParallelNode | FetchNode | FlattenNode;
